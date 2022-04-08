@@ -1,5 +1,6 @@
 ﻿using Battleship.Application.Interfaces;
 using Battleship.Application.Models.Dtos;
+using Battleship.Application.Models.Templates;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,23 +10,42 @@ using System.Threading.Tasks;
 namespace Battleship.Application.Services
 {
     public class GamePlayService : IGamePlayService
-    {        
-        char[] alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+    {
         private readonly IShipFactoryService _shipFactoryService;
-        GamePlace gamePlace;
+        public GamePlace GamePlace { get; set; }
+
         public GamePlayService(IShipFactoryService shipFactoryService)
         {
+            GamePlace = new GamePlace();
             _shipFactoryService = shipFactoryService;
-            gamePlace = new GamePlace();
         }
 
-        public async Task CreateGamePlacesAsync()
+        // GameSetup()--> SetupLayout(), SetupGamePlace(),SetupShip(), SetupPlayer() 
+        public async Task GameSetup()
         {
-            gamePlace.GameLayout = ArrangeLayout();
-            gamePlace.Ships = await CreateShipsAsync();
+            GamePlace.GameLayout = SetupLayout();
+            GamePlace.Ships = await CreateShipsAsync();
+            GamePlace.Ships = await PlaceShipAsync(GamePlace.Ships);
         }
 
-        public async Task<List<Ship>> CreateShipsAsync()
+        private GameLayout SetupLayout(int noOfColumns = 10, int noOfRows = 10)
+        {
+            char[] alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".ToCharArray();
+            var GamePlace = new GameLayout();
+            string[,] placeArray = new string[noOfColumns, noOfRows];
+            for (int column = 0; column < noOfColumns; column++)
+            {
+                for (int row = 0; row < noOfRows; row++)
+                {
+
+                    placeArray[row, column] = string.Concat(alpha[column], row);
+                }
+            }
+            GamePlace.GameArea = placeArray;
+            return GamePlace;
+        }      
+        
+        private async Task<List<Ship>> CreateShipsAsync()
         {
             List<Ship> ships = new List<Ship>();
             var battleshipService = _shipFactoryService.CreateShipService(Common.Enums.CommonEnums.ShipType.Battleship);
@@ -37,53 +57,48 @@ namespace Battleship.Application.Services
             return ships;
         }
 
-        public GameLayout ArrangeLayout(int noOfColumns = 10, int noOfRows = 10)
+        private async Task<List<Ship>> PlaceShipAsync(List<Ship> ships)
         {
-            
-            var gamePlace = new GameLayout();
-            string[,] placeArray = new string[noOfColumns, noOfRows];
-            for (int column = 0; column < noOfColumns; column++)
-            {
-                for (int row = 0; row < noOfRows; row++)
-                {
+            //GamePlace.GameLayout.ColumnCount - ship.SquresCount;
 
-                    placeArray[row, column] = string.Concat(alpha[column], row);
-                }
-            }
-            gamePlace.GameArea = placeArray;
-            return gamePlace;
+            ships[0].Location = SampleTemplates.Templates[0].FirstShipLocation;
+            ships[2].Location = SampleTemplates.Templates[0].FirstDistroyerLocation;            
+            ships[1].Location = SampleTemplates.Templates[0].SecondDistroyerLocation;
+
+            return ships;    
         }
 
-        public GamePlace Attack(int column, int row, GamePlace gamePlace)
+        // GamePlay()--> Attack()
+        public GamePlace Attack(int column, int row)
         {
-            if (gamePlace.GameLayout.AttackedArea[column][row] == 0)
+            if (GamePlace.GameLayout.AttackedArea[column][row] == 0)
             {
-                gamePlace.GameLayout.AttackedArea[column][row] = 1;
+                GamePlace.GameLayout.AttackedArea[column][row] = 1;
             }
-            return gamePlace;
+            return GamePlace;
         }
 
-        public bool IsAttacked(int column, int row, GameLayout gamePlace)
+        public bool IsAttacked(int column, int row)
         {
-            if (gamePlace.AttackedArea[column][row] == 0)
+            if (GamePlace.GameLayout.AttackedArea[column][row] == 0)
             {
                 return false;
             }
             return true;
         }
 
-        public bool IsSinkingShip(int attackedColumn, int attackedRow, Ship ship, GamePlace gamePlace)
+        public bool IsSinkingShip(int attackedColumn, int attackedRow, Ship ship)
         {
             bool isSinked = false;
 
             for (int i = 0; i < ship.Location.Length; i++)
             {
-                if (gamePlace.GameLayout.GameArea[attackedColumn + i, attackedRow].ToString() == ship.Location)
+                if (GamePlace.GameLayout.GameArea[attackedColumn + i, attackedRow].ToString() == ship.Location)
                 {
 
                     for (int j = 0; j < ship.Location.Length; j++)
                     {
-                        if (gamePlace.GameLayout.AttackedArea[attackedColumn + i][attackedRow] == 1)
+                        if (GamePlace.GameLayout.AttackedArea[attackedColumn + i][attackedRow] == 1)
                         {
                             isSinked = true;
                         }
@@ -99,6 +114,12 @@ namespace Battleship.Application.Services
 
 
             return isSinked;
+        }
+        
+        // Finish() --> Clear()
+        public void Clear()
+        {
+            GamePlace = new GamePlace();
         }
     }
 }
